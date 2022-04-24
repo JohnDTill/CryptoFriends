@@ -49,9 +49,26 @@ bool Set_1_Problem_1(){
     return failed;
 }
 
+bool Set_1_Problem_2(){
+    static constexpr char a_hex_str[] = "1c0111001f010100061a024b53535009181c";
+    static constexpr char b_hex_str[] = "686974207468652062756c6c277320657965";
+    static constexpr char xor_hex_str[] = "746865206b696420646f6e277420706c6179";
+
+    ByteArray a = ByteArray::fromHexString(a_hex_str);
+    ByteArray b = ByteArray::fromHexString(b_hex_str);
+    ByteArray XOR = ByteArray::exclusiveOr(a, b);
+    std::string xor_hex_eval = XOR.toHexString();
+
+    bool failed = (xor_hex_eval != xor_hex_str);
+    if(failed) std::cout << "S1P2: failed XOR operation" << std::endl;
+
+    return failed;
+}
+
 int main(){
     bool failed = false;
     failed |= Set_1_Problem_1();
+    failed |= Set_1_Problem_2();
 
     if(!failed) std::cout << "Tests passing" << std::endl;
 

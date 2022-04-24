@@ -173,6 +173,22 @@ public:
 
         return out;
     }
+
+    static ByteArray exclusiveOr(const ByteArray& a, const ByteArray& b){
+        assert(a.numBits() == b.numBits());
+
+        ByteArray out;
+        out.setUsedBitsInLastWord(a.usedBitsInLastWord());
+        std::vector<size_t>& out_data = out.data;
+        const std::vector<size_t>& a_data = a.data;
+        const std::vector<size_t>& b_data = b.data;
+        out_data.resize(a_data.size());
+
+        for(size_t i = out_data.size(); i-->0;)
+            out_data[i] = a_data[i] xor b_data[i];
+
+        return out;
+    }
 };
 
 }
