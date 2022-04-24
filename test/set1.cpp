@@ -1,13 +1,23 @@
 #include <cassert>
+#include <fstream>
 #include <functional>
 #include <iostream>
+#include <sstream>
 #include <vector>
 
 #include "base64.h"
 #include "bytearray.h"
 #include "hex.h"
+#include "text_frequency_analysis.h"
 
 using namespace CryptoFriends;
+
+static std::string getFileContents(const char* file_name){
+    std::ifstream in(file_name);
+    std::stringstream buffer;
+    buffer << in.rdbuf();
+    return buffer.str();
+}
 
 bool Set_1_Problem_1(){
     static constexpr char bin_str[] =
@@ -91,19 +101,28 @@ bool Set_1_Problem_3(){
     const ByteArray xor_encrypted_bytes = ByteArray::fromHexString(xor_encrypted_hex_string);
     bool fail = false;
 
-    for(uint8_t i = 1; i > 0; i++){
+    double best_score = 1;
+    uint8_t best_key;
+    for(uint16_t i = 0; i < 255; i++){
         ByteArray cipher;
         for(size_t j = 0; j < xor_encrypted_hex_string.length()/2; j++)
             cipher.addBits<8>(i);
         ByteArray output = ByteArray::exclusiveOr(xor_encrypted_bytes, cipher);
-        //std::cout << "Key " << (int)i << ": " << output.toAscii() << std::endl;
+        std::string str_out = output.toAscii();
+        toLowerCase(str_out);
+
+        double score = getScore(str_out);
+        if(score < best_score){
+            best_score = score;
+            best_key = static_cast<uint8_t>(i);
+        }
+        //std::cout << "Key " << (int)i << ": " << score << "  |  "<< str_out << std::endl;
         //88: Cooking MC's like a pound of bacon
     }
 
-    //DO THIS: automate recognition of valid solution
     ByteArray cipher;
     for(size_t j = 0; j < xor_encrypted_hex_string.length()/2; j++)
-        cipher.addBits<8>(88);
+        cipher.addBits<8>(best_key);
 
     ByteArray guess = ByteArray::exclusiveOr(xor_encrypted_bytes, cipher);
     if(guess.toAscii() != decrypted_msg){
@@ -119,8 +138,55 @@ bool Set_1_Problem_3(){
 bool Set_1_Problem_4(){
     bool fail = false;
 
-    //EVENTUALLY: complete this
-    if(!fail) std::cout << "S1P4: incomplete" << std::endl;
+    static constexpr std::string_view decrypted_msg =
+            "Now that the party is jumping\n";
+
+    std::vector<std::string> lines;
+    std::string line;
+    std::ifstream in("4.txt");
+    while(std::getline(in, line))
+        if(!line.empty()) lines.push_back(line);
+
+    double best_score = 1;
+    uint8_t best_key;
+    size_t best_line;
+    for(size_t line_num = 0; line_num < lines.size(); line_num++){
+        const std::string& line = lines[line_num];
+        const ByteArray xor_encrypted_bytes = ByteArray::fromHexString(line);
+        for(uint16_t i = 0; i < 255; i++){
+            ByteArray cipher;
+            for(size_t j = 0; j < line.length()/2; j++)
+                cipher.addBits<8>(i);
+            ByteArray output = ByteArray::exclusiveOr(xor_encrypted_bytes, cipher);
+            std::string str_out = output.toAscii();
+            toLowerCase(str_out);
+
+            double score = getScore(str_out);
+            if(score < best_score){
+                best_score = score;
+                best_key = static_cast<uint8_t>(i);
+                best_line = line_num;
+            }
+
+            //if(score < 0.6) std::cout << (int)line_num << ", Key " << (int)i << " | " << score << " :  "<< str_out << std::endl;
+            //Line 170, key 53: Now that the party is jumping
+        }
+    }
+
+    line = lines[best_line];
+    const ByteArray xor_encrypted_bytes = ByteArray::fromHexString(line);
+
+    ByteArray cipher;
+    for(size_t j = 0; j < line.length()/2; j++)
+        cipher.addBits<8>(best_key);
+
+    ByteArray guess = ByteArray::exclusiveOr(xor_encrypted_bytes, cipher);
+    if(guess.toAscii() != decrypted_msg){
+        fail = true;
+        std::cout << "S1P4: failed to find/decrypt message" << std::endl;
+    }
+
+    if(!fail) std::cout << "S1P4: passing" << std::endl;
 
     return fail;
 }
@@ -174,6 +240,8 @@ bool Set_1_Problem_7(){
     bool fail = false;
 
     //static constexpr std::string_view key = "YELLOW SUBMARINE";
+    std::string contents = getFileContents("7.txt");
+
     //EVENTUALLY: complete this
     if(!fail) std::cout << "S1P7: incomplete" << std::endl;
 
