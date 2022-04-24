@@ -189,6 +189,33 @@ public:
 
         return out;
     }
+
+    static ByteArray fromAscii(std::string_view str){
+        ByteArray array;
+        for(size_t i = str.size(); i-->0;){
+            uint8_t byte = str[i];
+            array.addBits<BITS_PER_BYTE>(byte);
+        }
+
+        return array;
+    }
+
+    std::string toAscii() const{
+        std::string out;
+        const size_t total_bits = numBits();
+        out.reserve(total_bits / BITS_PER_BYTE);
+
+        const size_t offset = total_bits%BITS_PER_BYTE;
+        size_t index = total_bits + (offset ? BITS_PER_BYTE-offset : 0);
+
+        while(index > 0){
+            index -= BITS_PER_BYTE;
+            uint8_t byte = getBits<BITS_PER_BYTE, uint8_t>(index);
+            out += byte;
+        }
+
+        return out;
+    }
 };
 
 }

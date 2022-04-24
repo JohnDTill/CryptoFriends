@@ -16,6 +16,8 @@ bool Set_1_Problem_1(){
         "49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d";
     static constexpr char b64_str[] =
         "SSdtIGtpbGxpbmcgeW91ciBicmFpbiBsaWtlIGEgcG9pc29ub3VzIG11c2hyb29t";
+    static constexpr char ascii_str[] =
+        "I'm killing your brain like a poisonous mushroom";
 
     struct Format {
         std::string name;
@@ -25,9 +27,10 @@ bool Set_1_Problem_1(){
     };
 
     std::vector<Format> formats = {
-        {.name="binary", .src=bin_str, .builder=ByteArray::fromBinaryString, .printer=&ByteArray::toBinaryString},
-        {.name="hex",    .src=hex_str, .builder=ByteArray::fromHexString,    .printer=&ByteArray::toHexString},
-        {.name="base64", .src=b64_str, .builder=ByteArray::fromBase64String, .printer=&ByteArray::toBase64String},
+        {.name="ascii",  .src=ascii_str, .builder=ByteArray::fromAscii,        .printer=&ByteArray::toAscii},
+        {.name="binary", .src=bin_str,   .builder=ByteArray::fromBinaryString, .printer=&ByteArray::toBinaryString},
+        {.name="hex",    .src=hex_str,   .builder=ByteArray::fromHexString,    .printer=&ByteArray::toHexString},
+        {.name="base64", .src=b64_str,   .builder=ByteArray::fromBase64String, .printer=&ByteArray::toBase64String},
     };
 
     //Test all permutations of input and output
@@ -59,8 +62,50 @@ bool Set_1_Problem_2(){
     ByteArray XOR = ByteArray::exclusiveOr(a, b);
     std::string xor_hex_eval = XOR.toHexString();
 
-    bool failed = (xor_hex_eval != xor_hex_str);
-    if(failed) std::cout << "S1P2: failed XOR operation" << std::endl;
+    bool failed = false;
+
+    if(xor_hex_eval != xor_hex_str){
+        failed = true;
+        std::cout << "S1P2: failed XOR operation" << std::endl;
+    }
+
+    if(XOR.toAscii() != "the kid don't play"){
+        failed = true;
+        std::cout << "S1P2: ascii conversion failed" << std::endl;
+    }
+
+    return failed;
+}
+
+bool Set_1_Problem_3(){
+    static constexpr std::string_view xor_encrypted_hex_string =
+            "1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736";
+
+    static constexpr std::string_view decrypted_msg =
+            "Cooking MC's like a pound of bacon";
+
+    const ByteArray xor_encrypted_bytes = ByteArray::fromHexString(xor_encrypted_hex_string);
+    bool failed = false;
+
+    for(uint8_t i = 1; i > 0; i++){
+        ByteArray cipher;
+        for(size_t j = 0; j < xor_encrypted_hex_string.length()/2; j++)
+            cipher.addBits<8>(i);
+        ByteArray output = ByteArray::exclusiveOr(xor_encrypted_bytes, cipher);
+        //std::cout << "Key " << (int)i << ": " << output.toAscii() << std::endl;
+        //88: Cooking MC's like a pound of bacon
+    }
+
+    //DO THIS: automate recognition of valid solution
+    ByteArray cipher;
+    for(size_t j = 0; j < xor_encrypted_hex_string.length()/2; j++)
+        cipher.addBits<8>(88);
+
+    ByteArray guess = ByteArray::exclusiveOr(xor_encrypted_bytes, cipher);
+    if(guess.toAscii() != decrypted_msg){
+        failed = true;
+        std::cout << "S1P3: failed to decrypt message" << std::endl;
+    }
 
     return failed;
 }
@@ -69,6 +114,7 @@ int main(){
     bool failed = false;
     failed |= Set_1_Problem_1();
     failed |= Set_1_Problem_2();
+    failed |= Set_1_Problem_3();
 
     if(!failed) std::cout << "Tests passing" << std::endl;
 
