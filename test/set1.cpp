@@ -34,7 +34,7 @@ bool Set_1_Problem_1(){
     };
 
     //Test all permutations of input and output
-    bool failed = false;
+    bool fail = false;
     for(size_t i = 0; i < formats.size(); i++){
         for(size_t j = 0; j < formats.size(); j++){
             const Format& input = formats[i];
@@ -44,12 +44,14 @@ bool Set_1_Problem_1(){
             std::string out = (array.*output.printer)();
             bool success = (out == output.src);
             if(success) continue;
-            failed = true;
+            fail = true;
             std::cout << "S1P1: failed conversion " << input.name << " => ByteArray => " << output.name << std::endl;
         }
     }
 
-    return failed;
+    if(!fail) std::cout << "S1P1: passing" << std::endl;
+
+    return fail;
 }
 
 bool Set_1_Problem_2(){
@@ -62,19 +64,21 @@ bool Set_1_Problem_2(){
     ByteArray XOR = ByteArray::exclusiveOr(a, b);
     std::string xor_hex_eval = XOR.toHexString();
 
-    bool failed = false;
+    bool fail = false;
 
     if(xor_hex_eval != xor_hex_str){
-        failed = true;
+        fail = true;
         std::cout << "S1P2: failed XOR operation" << std::endl;
     }
 
     if(XOR.toAscii() != "the kid don't play"){
-        failed = true;
+        fail = true;
         std::cout << "S1P2: ascii conversion failed" << std::endl;
     }
 
-    return failed;
+    if(!fail) std::cout << "S1P2: passing" << std::endl;
+
+    return fail;
 }
 
 bool Set_1_Problem_3(){
@@ -85,7 +89,7 @@ bool Set_1_Problem_3(){
             "Cooking MC's like a pound of bacon";
 
     const ByteArray xor_encrypted_bytes = ByteArray::fromHexString(xor_encrypted_hex_string);
-    bool failed = false;
+    bool fail = false;
 
     for(uint8_t i = 1; i > 0; i++){
         ByteArray cipher;
@@ -103,11 +107,86 @@ bool Set_1_Problem_3(){
 
     ByteArray guess = ByteArray::exclusiveOr(xor_encrypted_bytes, cipher);
     if(guess.toAscii() != decrypted_msg){
-        failed = true;
+        fail = true;
         std::cout << "S1P3: failed to decrypt message" << std::endl;
     }
 
-    return failed;
+    if(!fail) std::cout << "S1P3: passing" << std::endl;
+
+    return fail;
+}
+
+bool Set_1_Problem_4(){
+    bool fail = false;
+
+    //EVENTUALLY: complete this
+    if(!fail) std::cout << "S1P4: incomplete" << std::endl;
+
+    return fail;
+}
+
+bool Set_1_Problem_5(){
+    bool fail = false;
+
+    static constexpr std::string_view plain_text =
+            "Burning 'em, if you ain't quick and nimble\n"
+            "I go crazy when I hear a cymbal";
+
+    static constexpr std::string_view encrypted_hex =
+            "0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272a282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f";
+
+    static constexpr std::string_view key = "ICE";
+
+    ByteArray bytes = ByteArray::fromAscii(plain_text);
+    bytes.applyRepeatingKeyXor(key);
+    if(bytes.toHexString() != encrypted_hex){
+        fail = true;
+        std::cout << "S1P5: repeated-key XOR did not produce expected result" << std::endl;
+    }
+
+    if(!fail) std::cout << "S1P5: passing" << std::endl;
+
+    return fail;
+}
+
+bool Set_1_Problem_6(){
+    bool fail = false;
+
+    static constexpr std::string_view hamming_input_a = "this is a test";
+    static constexpr std::string_view hamming_input_b = "wokka wokka!!!";
+
+    ByteArray array_a = ByteArray::fromAscii(hamming_input_a);
+    ByteArray array_b = ByteArray::fromAscii(hamming_input_b);
+    size_t computed_hamming_distance = ByteArray::differingBits(array_a, array_b);
+    static constexpr size_t EXPECTED_HAMMING_DISTANCE = 37;
+    if(computed_hamming_distance != EXPECTED_HAMMING_DISTANCE){
+        fail = true;
+        std::cout << "S1P6: incorrect hamming distance" << std::endl;
+    }
+
+    //EVENTUALLY: do the rest of this problem
+    if(!fail) std::cout << "S1P6: incomplete" << std::endl;
+
+    return fail;
+}
+
+bool Set_1_Problem_7(){
+    bool fail = false;
+
+    //static constexpr std::string_view key = "YELLOW SUBMARINE";
+    //EVENTUALLY: complete this
+    if(!fail) std::cout << "S1P7: incomplete" << std::endl;
+
+    return fail;
+}
+
+bool Set_1_Problem_8(){
+    bool fail = false;
+
+    //EVENTUALLY: complete this
+    if(!fail) std::cout << "S1P8: incomplete" << std::endl;
+
+    return fail;
 }
 
 int main(){
@@ -115,8 +194,13 @@ int main(){
     failed |= Set_1_Problem_1();
     failed |= Set_1_Problem_2();
     failed |= Set_1_Problem_3();
+    failed |= Set_1_Problem_4();
+    failed |= Set_1_Problem_5();
+    failed |= Set_1_Problem_6();
+    failed |= Set_1_Problem_7();
+    failed |= Set_1_Problem_8();
 
-    if(!failed) std::cout << "Tests passing" << std::endl;
+    if(!failed) std::cout << "No failures" << std::endl;
 
     return failed;
 }

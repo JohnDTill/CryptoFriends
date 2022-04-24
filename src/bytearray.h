@@ -23,17 +23,20 @@ private:
     static constexpr uint8_t BYTES_PER_WORD = sizeof(size_t);
     static constexpr uint8_t BITS_PER_BYTE = 8;
     static constexpr uint8_t BITS_PER_WORD = BITS_PER_BYTE*BYTES_PER_WORD;
-    static constexpr bool isBitSet(size_t word, uint8_t bit) noexcept{
+    static constexpr uint8_t bitsToBytes(uint8_t bits) noexcept { return bits / BITS_PER_BYTE + (bits % BITS_PER_BYTE > 0); }
+    static constexpr bool isBitSet(size_t word, uint8_t bit) noexcept {
         assert(bit < BITS_PER_WORD);
         return word & (size_t(1) << bit);
     }
-    static constexpr char bitChar(size_t word, uint8_t bit) noexcept{
+    static constexpr char bitChar(size_t word, uint8_t bit) noexcept {
         return '0' + isBitSet(word, bit);
     }
     std::vector<size_t> data = {0};
     uint8_t used_bits = 0;
     uint8_t usedBitsInLastWord() const noexcept { return used_bits; }
     uint8_t unusedBitsInLastWord() const noexcept { return BITS_PER_WORD - used_bits; }
+    uint8_t usedBytesInLastWord() const noexcept { return bitsToBytes(usedBitsInLastWord()); }
+    uint8_t unusedBytesInLastWord() const noexcept { return BYTES_PER_WORD - usedBytesInLastWord(); }
     void setUsedBitsInLastWord(uint8_t n_bits) noexcept {
         assert(n_bits < BITS_PER_WORD);
         used_bits = n_bits;
@@ -43,10 +46,15 @@ private:
         used_bits = BITS_PER_WORD - n_bits;
     }
     size_t allocatedBits() const noexcept{ return BITS_PER_WORD*data.size(); }
+    size_t allocatedBytes() const noexcept{ return BYTES_PER_WORD*data.size(); }
 
 public:
     size_t numBits() const noexcept{
         return allocatedBits() - unusedBitsInLastWord();
+    }
+
+    size_t numBytes() const noexcept{
+        return allocatedBytes() - unusedBytesInLastWord();
     }
 
     void addBit(bool set){
@@ -174,22 +182,6 @@ public:
         return out;
     }
 
-    static ByteArray exclusiveOr(const ByteArray& a, const ByteArray& b){
-        assert(a.numBits() == b.numBits());
-
-        ByteArray out;
-        out.setUsedBitsInLastWord(a.usedBitsInLastWord());
-        std::vector<size_t>& out_data = out.data;
-        const std::vector<size_t>& a_data = a.data;
-        const std::vector<size_t>& b_data = b.data;
-        out_data.resize(a_data.size());
-
-        for(size_t i = out_data.size(); i-->0;)
-            out_data[i] = a_data[i] xor b_data[i];
-
-        return out;
-    }
-
     static ByteArray fromAscii(std::string_view str){
         ByteArray array;
         for(size_t i = str.size(); i-->0;){
@@ -215,6 +207,48 @@ public:
         }
 
         return out;
+    }
+
+    static ByteArray exclusiveOr(const ByteArray& a, const ByteArray& b){
+        assert(a.numBits() == b.numBits());
+
+        ByteArray out;
+        out.setUsedBitsInLastWord(a.usedBitsInLastWord());
+        std::vector<size_t>& out_data = out.data;
+        const std::vector<size_t>& a_data = a.data;
+        const std::vector<size_t>& b_data = b.data;
+        out_data.resize(a_data.size());
+
+        for(size_t i = out_data.size(); i-->0;)
+            out_data[i] = a_data[i] xor b_data[i];
+
+        return out;
+    }
+
+    void applyRepeatingKeyXor(std::string_view keyword) noexcept {
+        size_t index = unusedBytesInLastWord()%keyword.size();
+        for(size_t i = data.size(); i-->0;)
+            for(size_t j = BITS_PER_WORD; j > 0;){
+                j -= BITS_PER_BYTE;
+                uint8_t byte = static_cast<uint8_t>(keyword[index]);
+                data[i] ^= (static_cast<size_t>(byte) << j);
+                if(++index == keyword.size()) index = 0;
+            }
+        data.back() &= (1 << usedBitsInLastWord()) - 1;
+    }
+
+    static size_t differingBits(const ByteArray& a, const ByteArray& b) noexcept {
+        //aka Hamming distance
+        size_t differing_bits = 0;
+        const std::vector<size_t>& a_data = a.data;
+        const std::vector<size_t>& b_data = b.data;
+        for(size_t i = 0; i < a_data.size(); i++){
+            const size_t diff = a_data[i] ^ b_data[i];
+            for(size_t j = 0; j < BITS_PER_WORD; j++)
+                differing_bits += isBitSet(diff, j);
+        }
+
+        return differing_bits;
     }
 };
 
