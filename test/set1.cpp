@@ -3,7 +3,6 @@
 #include <fstream>
 #include <functional>
 #include <iostream>
-#include <span>
 #include <sstream>
 #include <vector>
 
@@ -277,11 +276,9 @@ bool Set_1_Problem_6(){
     );
 
     static constexpr size_t RESULTS_TO_USE = 5;
-    std::span<Result> to_use(results.begin(), results.begin()+RESULTS_TO_USE);
 
-    //DO THIS: do the rest of this problem
-
-    for(const Result& result : to_use){
+    for(size_t i = 0; i < RESULTS_TO_USE; i++){
+        const Result& result = results[i];
         std::vector<ByteArray> arrays;
         arrays.resize(result.key_size);
 
