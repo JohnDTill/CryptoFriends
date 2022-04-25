@@ -1,12 +1,15 @@
+#include <algorithm>
 #include <cassert>
 #include <fstream>
 #include <functional>
 #include <iostream>
+#include <span>
 #include <sstream>
 #include <vector>
 
 #include "base64.h"
 #include "bytearray.h"
+#include "decrypt.h"
 #include "hex.h"
 #include "text_frequency_analysis.h"
 
@@ -16,7 +19,11 @@ static std::string getFileContents(const char* file_name){
     std::ifstream in(file_name);
     std::stringstream buffer;
     buffer << in.rdbuf();
-    return buffer.str();
+    std::string str = buffer.str();
+    #ifdef _WIN32
+    str.erase(std::remove(str.begin(), str.end(), '\r'), str.end());
+    #endif
+    return str;
 }
 
 bool Set_1_Problem_1(){
@@ -230,7 +237,107 @@ bool Set_1_Problem_6(){
         std::cout << "S1P6: incorrect hamming distance" << std::endl;
     }
 
-    //EVENTUALLY: do the rest of this problem
+    std::string encryped_base64 = getFileContents("6.txt");
+    encryped_base64.erase(remove(encryped_base64.begin(), encryped_base64.end(), '\n'), encryped_base64.end());
+    ByteArray encrypted_bytes = ByteArray::fromBase64String(encryped_base64);
+
+    static constexpr size_t KEY_SIZE_MIN_BYTES = 2;
+    static constexpr size_t KEY_SIZE_MAX_BYTES = 40;
+
+    struct Result{
+        size_t key_size;
+        double normalised_edit_distance;
+    };
+
+    std::vector<Result> results;
+
+    for(size_t key_size = KEY_SIZE_MIN_BYTES; key_size <= KEY_SIZE_MAX_BYTES; key_size++){
+        size_t differing_bits = 0;
+
+        for(size_t byte = 0; byte < key_size; byte++){
+            const size_t a = encrypted_bytes.getByte(byte);
+            const size_t b = encrypted_bytes.getByte(key_size + byte);
+            const size_t diff = a ^ b;
+            for(uint8_t j = 0; j < BITS_PER_BYTE; j++)
+                differing_bits += isBitSet(diff, j);
+        }
+
+        double normalised_edit_distance = static_cast<double>(differing_bits) / key_size;
+
+        results.push_back(Result{
+            .key_size = key_size,
+            .normalised_edit_distance = normalised_edit_distance
+        });
+    }
+
+    std::sort(
+        results.begin(),
+        results.end(),
+        [](const Result& a, const Result& b){return a.normalised_edit_distance < b.normalised_edit_distance;}
+    );
+
+    static constexpr size_t RESULTS_TO_USE = 5;
+    std::span<Result> to_use(results.begin(), results.begin()+RESULTS_TO_USE);
+
+    //DO THIS: do the rest of this problem
+
+    for(const Result& result : to_use){
+        std::vector<ByteArray> arrays;
+        arrays.resize(result.key_size);
+
+        std::vector<std::string> decoded_strings;
+        decoded_strings.resize(result.key_size);
+
+        //Divide the encryped data for single-XOR analysis
+        size_t index = 0;
+        for(size_t byte = 0; byte < encrypted_bytes.numBytes(); byte++){
+            arrays[index++].addBits<8>( encrypted_bytes.getByte(byte) );
+            if(index == arrays.size()) index = 0;
+        }
+
+        for(size_t j = 0; j < result.key_size; j++){
+            const ByteArray& divided_array = arrays[j];
+            double best_score = std::numeric_limits<double>::max();
+            for(uint16_t i = 0; i < 255; i++){
+                ByteArray cipher;
+                for(size_t j = 0; j < divided_array.numBytes(); j++)
+                    cipher.addBits<8>(i);
+                ByteArray output = ByteArray::exclusiveOr(divided_array, cipher);
+                std::string str_out = output.toAscii();
+                toLowerCase(str_out);
+
+                double score = getScore(str_out);
+                if(score < best_score){
+                    best_score = score;
+                    decoded_strings[j] = str_out;
+                }
+
+                //std::cout << "K" << result.key_size << "i" << j << str_out << "g" << i << ": " << str_out << std::endl;
+            }
+        }
+
+        std::string solved;
+        solved.reserve(encrypted_bytes.numBytes());
+        index = 0;
+        size_t str_index = 0;
+        for(size_t byte = 0; byte < encrypted_bytes.numBytes(); byte++){
+            char ch = decoded_strings[index++][str_index];
+            solved += ch;
+            if(index == arrays.size()){
+                index = 0;
+                str_index++;
+            }
+        }
+
+        //std::cout << "Key size " << (int)result.key_size << ":\n"
+        //          << solved << '\n' << std::endl;
+    }
+
+    //Now that you probably know the KEYSIZE: break the ciphertext into blocks of KEYSIZE length.
+    //Now transpose the blocks: make a block that is the first byte of every block, and a block that is the second byte of every block, and so on.
+    //Solve each block as if it was single-character XOR. You already have code to do this.
+    //For each block, the single-byte XOR key that produces the best looking histogram is the repeating-key XOR key byte for that block. Put them together and you have the key.
+
     if(!fail) std::cout << "S1P6: incomplete" << std::endl;
 
     return fail;
@@ -239,11 +346,19 @@ bool Set_1_Problem_6(){
 bool Set_1_Problem_7(){
     bool fail = false;
 
-    //static constexpr std::string_view key = "YELLOW SUBMARINE";
-    std::string contents = getFileContents("7.txt");
+    static constexpr std::string_view key = "YELLOW SUBMARINE";
+    std::string contents_base64 = getFileContents("7.txt");
+    contents_base64.erase(remove(contents_base64.begin(), contents_base64.end(), '\n'), contents_base64.end());
+    ByteArray ba = ByteArray::fromBase64String(contents_base64);
+    const std::string encryped_ascii = ba.toAscii();
+    const std::string plain_text = decrypt(encryped_ascii, key);
 
-    //EVENTUALLY: complete this
-    if(!fail) std::cout << "S1P7: incomplete" << std::endl;
+    if(plain_text != getFileContents("7_solved.txt")){
+        fail = true;
+        std::cout << "S1P7: failed to decrypt file with OpenSSL" << std::endl;
+    }
+
+    if(!fail) std::cout << "S1P7: passing" << std::endl;
 
     return fail;
 }

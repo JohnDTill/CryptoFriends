@@ -10,6 +10,20 @@
 
 namespace CryptoFriends {
 
+template<typename T> static constexpr size_t byteSize() noexcept { return sizeof(T); }
+template<typename T> static constexpr size_t bitSize() noexcept { return 8*byteSize<T>(); }
+constexpr uint8_t BYTES_PER_WORD = sizeof(size_t);
+constexpr uint8_t BITS_PER_BYTE = 8;
+constexpr uint8_t BITS_PER_WORD = BITS_PER_BYTE*BYTES_PER_WORD;
+constexpr uint8_t bitsToBytes(uint8_t bits) noexcept { return bits / BITS_PER_BYTE + (bits % BITS_PER_BYTE > 0); }
+constexpr bool isBitSet(size_t word, uint8_t bit) noexcept {
+    assert(bit < BITS_PER_WORD);
+    return word & (size_t(1) << bit);
+}
+static constexpr char bitChar(size_t word, uint8_t bit) noexcept {
+    return '0' + isBitSet(word, bit);
+}
+
 class ByteArray{
 
 private:
@@ -18,19 +32,6 @@ private:
     //After an operation:
     //   The vector will have unused space. unusedBits() is never 0.
 
-    template<typename T> static constexpr size_t byteSize() noexcept { return sizeof(T); }
-    template<typename T> static constexpr size_t bitSize() noexcept { return 8*byteSize<T>(); }
-    static constexpr uint8_t BYTES_PER_WORD = sizeof(size_t);
-    static constexpr uint8_t BITS_PER_BYTE = 8;
-    static constexpr uint8_t BITS_PER_WORD = BITS_PER_BYTE*BYTES_PER_WORD;
-    static constexpr uint8_t bitsToBytes(uint8_t bits) noexcept { return bits / BITS_PER_BYTE + (bits % BITS_PER_BYTE > 0); }
-    static constexpr bool isBitSet(size_t word, uint8_t bit) noexcept {
-        assert(bit < BITS_PER_WORD);
-        return word & (size_t(1) << bit);
-    }
-    static constexpr char bitChar(size_t word, uint8_t bit) noexcept {
-        return '0' + isBitSet(word, bit);
-    }
     std::vector<size_t> data = {0};
     uint8_t used_bits = 0;
     uint8_t usedBitsInLastWord() const noexcept { return used_bits; }
@@ -103,6 +104,13 @@ public:
         }
     }
 
+    uint8_t getByte(size_t byte_index) const noexcept {
+        assert(byte_index < numBytes());
+        const size_t word_index = byte_index / BYTES_PER_WORD;
+        const size_t shift = (byte_index % BYTES_PER_WORD) * BITS_PER_BYTE;
+        return data[word_index] >> shift;
+    }
+
     std::string toBinaryString() const {
         std::string out;
         out.reserve(data.size()*BITS_PER_WORD - unusedBitsInLastWord());
@@ -158,6 +166,7 @@ public:
     static ByteArray fromBase64String(std::string_view str){
         ByteArray array;
         for(size_t i = str.size(); i-->0;){
+            if(str[i] == '=') continue;
             uint8_t byte = base64CharToByte(str[i]);
             array.addBits<BITS_PER_BASE64_CHAR>(byte);
         }

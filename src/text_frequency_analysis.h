@@ -67,10 +67,11 @@ double getScore(std::string_view str) noexcept {
     static constexpr double HIGH_PENALTY_FOR_NONPRINTABLE_CHARS = 0.5;
     static constexpr double MEDIUM_PENALTY_FOR_SYMBOLS = 0.1;
     for(char ch : str){
-        uint8_t byte = ch;
+        unsigned char byte = ch;
         if(byte < 32 || byte > 127) sum_of_squares += HIGH_PENALTY_FOR_NONPRINTABLE_CHARS;
-        else if((ch < 'a' || ch > 'z') && ch != ' ') sum_of_squares += MEDIUM_PENALTY_FOR_SYMBOLS;
-        else if(ch == '\n' || ch == '\r' || ch == '\t') return 30;
+        else if((ch < 'a' || ch > 'z') && ch != ' ' && ch != '\'' && ch != '.' && ch != ',' && ch != '-')
+            sum_of_squares += MEDIUM_PENALTY_FOR_SYMBOLS;
+        else if(ch == '\r' || ch == '\t') return 30;
     }
 
     auto occurences = getFrequencies(str);

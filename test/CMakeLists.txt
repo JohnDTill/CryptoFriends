@@ -15,6 +15,7 @@ include_directories(${SRC})
 add_executable(CryptoFriendshipTest01
     ${SRC}/base64.h
     ${SRC}/bytearray.h
+    ${SRC}/decrypt.h
     ${SRC}/hex.h
     ${SRC}/text_frequency_analysis.h
     set1.cpp
@@ -23,6 +24,7 @@ add_executable(CryptoFriendshipTest01
 configure_file(${TEST}/4.txt . COPYONLY)
 configure_file(${TEST}/6.txt . COPYONLY)
 configure_file(${TEST}/7.txt . COPYONLY)
+configure_file(${TEST}/7_solved.txt . COPYONLY)
 configure_file(${TEST}/8.txt . COPYONLY)
 
 target_link_libraries(CryptoFriendshipTest01 OpenSSL::SSL)
