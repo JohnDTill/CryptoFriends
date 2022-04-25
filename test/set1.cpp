@@ -332,7 +332,7 @@ bool Set_1_Problem_6(){
 
     //Now that you probably know the KEYSIZE: break the ciphertext into blocks of KEYSIZE length.
     //Now transpose the blocks: make a block that is the first byte of every block, and a block that is the second byte of every block, and so on.
-    //Solve each block as if it was single-character XOR. You already have code to do this.
+    //Solve each block as if it was single-character XOR. You already have code for this.
     //For each block, the single-byte XOR key that produces the best looking histogram is the repeating-key XOR key byte for that block. Put them together and you have the key.
 
     if(!fail) std::cout << "S1P6: incomplete" << std::endl;

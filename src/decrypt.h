@@ -2,6 +2,7 @@
 #define DECRYPT_H
 
 #include <cassert>
+#include <cstring>
 #include <string>
 
 #include <openssl/aes.h>
