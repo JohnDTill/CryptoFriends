@@ -17,6 +17,7 @@ Cargo.lock
 src/generated/*
 */out/*
 */CMakeCache.txt
+.idea/*
 
 #Qt
 *.pro.user*

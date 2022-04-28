@@ -115,9 +115,8 @@ bool Set_1_Problem_3(){
             cipher.addBits<8>(i);
         ByteArray output = ByteArray::exclusiveOr(xor_encrypted_bytes, cipher);
         std::string str_out = output.toAscii();
-        toLowerCase(str_out);
 
-        double score = getScore(str_out);
+        double score = l1Score(str_out);
         if(score < best_score){
             best_score = score;
             best_key = static_cast<uint8_t>(i);
@@ -165,9 +164,8 @@ bool Set_1_Problem_4(){
                 cipher.addBits<8>(i);
             ByteArray output = ByteArray::exclusiveOr(xor_encrypted_bytes, cipher);
             std::string str_out = output.toAscii();
-            toLowerCase(str_out);
 
-            double score = getScore(str_out);
+            double score = l1Score(str_out);
             if(score < best_score){
                 best_score = score;
                 best_key = static_cast<uint8_t>(i);
@@ -236,9 +234,9 @@ bool Set_1_Problem_6(){
         std::cout << "S1P6: incorrect hamming distance" << std::endl;
     }
 
-    std::string encryped_base64 = getFileContents("6.txt");
-    encryped_base64.erase(remove(encryped_base64.begin(), encryped_base64.end(), '\n'), encryped_base64.end());
-    ByteArray encrypted_bytes = ByteArray::fromBase64String(encryped_base64);
+    std::string encrypted_base64 = getFileContents("6.txt");
+    encrypted_base64.erase(remove(encrypted_base64.begin(), encrypted_base64.end(), '\n'), encrypted_base64.end());
+    const ByteArray encrypted_bytes = ByteArray::fromBase64String(encrypted_base64);
 
     static constexpr size_t KEY_SIZE_MIN_BYTES = 2;
     static constexpr size_t KEY_SIZE_MAX_BYTES = 40;
@@ -301,17 +299,18 @@ bool Set_1_Problem_6(){
                     cipher.addBits<8>(i);
                 ByteArray output = ByteArray::exclusiveOr(divided_array, cipher);
                 std::string str_out = output.toAscii();
-                toLowerCase(str_out);
 
-                double score = getScore(str_out);
+                double score = l1Score(str_out);
                 if(score < best_score){
                     best_score = score;
                     decoded_strings[j] = str_out;
                 }
-
-                //std::cout << "K" << result.key_size << "i" << j << str_out << "g" << i << ": " << str_out << std::endl;
             }
+
+            //std::cout << "K" << result.key_size << "i" << j << "g" << i << ": " << decoded_strings[j] << std::endl;
         }
+
+
 
         std::string solved;
         solved.reserve(encrypted_bytes.numBytes());
