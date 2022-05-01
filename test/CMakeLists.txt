@@ -26,6 +26,7 @@ add_executable(CryptoFriendshipTest01
 
 configure_file(${TEST}/4.txt . COPYONLY)
 configure_file(${TEST}/6.txt . COPYONLY)
+configure_file(${TEST}/6_solved.txt . COPYONLY)
 configure_file(${TEST}/7.txt . COPYONLY)
 configure_file(${TEST}/7_solved.txt . COPYONLY)
 configure_file(${TEST}/8.txt . COPYONLY)

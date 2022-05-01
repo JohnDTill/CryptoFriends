@@ -16,7 +16,9 @@ def code_gen():
         includes=["array"],
     )
 
-    header_writer.write("extern constexpr std::array<double, 256> FREQUENCY_MAP = {\n")
+    header_writer.write(
+        "typedef std::array<double, 256> Frequency;\n"
+        "extern constexpr Frequency FREQUENCY_MAP = {\n")
     for i, entry in enumerate(occurrences):
         header_writer.write("    ")
         if chr(i) == '\n':

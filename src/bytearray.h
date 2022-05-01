@@ -3,6 +3,7 @@
 
 #include "base64.h"
 #include "hex.h"
+#include "text_frequency_analysis.h"
 
 #include <cassert>
 #include <string>
@@ -48,6 +49,8 @@ private:
     }
     size_t allocatedBits() const noexcept{ return BITS_PER_WORD*data.size(); }
     size_t allocatedBytes() const noexcept{ return BYTES_PER_WORD*data.size(); }
+
+    uint8_t padding_front = 0; //EVENTUALLY: this is a terrible hack. Make a better design for base64.
 
 public:
     size_t numBits() const noexcept{
@@ -108,7 +111,16 @@ public:
         assert(byte_index < numBytes());
         const size_t word_index = byte_index / BYTES_PER_WORD;
         const size_t shift = (byte_index % BYTES_PER_WORD) * BITS_PER_BYTE;
-        return data[word_index] >> shift;
+        return static_cast<uint8_t>(data[word_index] >> shift);
+    }
+
+    void setByte(size_t byte_index, uint8_t byte) noexcept{
+        assert(byte_index < numBytes());
+        const size_t word_index = byte_index / BYTES_PER_WORD;
+        const size_t shift = (byte_index % BYTES_PER_WORD) * BITS_PER_BYTE;
+        const size_t zero_byte_mask = ~(size_t(255) << shift);
+        data[word_index] &= zero_byte_mask;
+        data[word_index] ^= (static_cast<size_t>(byte) << shift);
     }
 
     std::string toBinaryString() const {
@@ -119,7 +131,7 @@ public:
         for(uint8_t i = usedBitsInLastWord(); i-->0;)
             out += bitChar(last_word, i);
 
-        for(size_t i = data.size()-1; i-->0;)
+        for(size_t i = data.size()-1; i-->padding_front;)
             for(uint8_t j = BITS_PER_WORD; j-->0;)
                 out += bitChar(data[i], j);
 
@@ -154,7 +166,7 @@ public:
         const size_t offset = total_bits%BITS_PER_HEX_CHAR;
         size_t index = total_bits + (offset ? BITS_PER_HEX_CHAR-offset : 0);
 
-        while(index > 0){
+        while(index > padding_front){
             index -= BITS_PER_HEX_CHAR;
             uint8_t byte = getBits<BITS_PER_HEX_CHAR, uint8_t>(index);
             out += byteToHexChar(byte);
@@ -166,7 +178,12 @@ public:
     static ByteArray fromBase64String(std::string_view str){
         ByteArray array;
         for(size_t i = str.size(); i-->0;){
-            if(str[i] == '=') continue;
+            if(str[i] == '='){
+                array.addBits<BITS_PER_BASE64_CHAR>(0);
+                array.padding_front += 8;
+                continue;
+            }
+            else if(str[i] == '=' || str[i] == '\n' || str[i] == '\r') continue;
             uint8_t byte = base64CharToByte(str[i]);
             array.addBits<BITS_PER_BASE64_CHAR>(byte);
         }
@@ -209,7 +226,7 @@ public:
         const size_t offset = total_bits%BITS_PER_BYTE;
         size_t index = total_bits + (offset ? BITS_PER_BYTE-offset : 0);
 
-        while(index > 0){
+        while(index > padding_front){
             index -= BITS_PER_BYTE;
             uint8_t byte = getBits<BITS_PER_BYTE, uint8_t>(index);
             out += byte;
@@ -235,15 +252,13 @@ public:
     }
 
     void applyRepeatingKeyXor(std::string_view keyword) noexcept {
-        size_t index = unusedBytesInLastWord()%keyword.size();
-        for(size_t i = data.size(); i-->0;)
-            for(size_t j = BITS_PER_WORD; j > 0;){
-                j -= BITS_PER_BYTE;
-                uint8_t byte = static_cast<uint8_t>(keyword[index]);
-                data[i] ^= (static_cast<size_t>(byte) << j);
-                if(++index == keyword.size()) index = 0;
-            }
-        data.back() &= (1 << usedBitsInLastWord()) - 1;
+        size_t index = 0;
+        for(size_t i = numBytes(); i-->0;){
+            uint8_t byte = getByte(i);
+            uint8_t xor_result = byte ^ keyword[index];
+            setByte(i, xor_result);
+            if(++index == keyword.size()) index = 0;
+        }
     }
 
     static size_t differingBits(const ByteArray& a, const ByteArray& b) noexcept {
@@ -253,11 +268,51 @@ public:
         const std::vector<size_t>& b_data = b.data;
         for(size_t i = 0; i < a_data.size(); i++){
             const size_t diff = a_data[i] ^ b_data[i];
-            for(size_t j = 0; j < BITS_PER_WORD; j++)
+            for(uint8_t j = 0; j < BITS_PER_WORD; j++)
                 differing_bits += isBitSet(diff, j);
         }
 
         return differing_bits;
+    }
+
+    double scoreGuess(size_t start, size_t offset, uint8_t guess) const noexcept {
+        assert(start < offset);
+
+        Frequency freq = {0};
+        size_t total = 0;
+        for(size_t i = numBytes()-start-1; i < numBytes(); i -= offset){
+            freq[getByte(i) ^ guess] += 1;
+            total++;
+        }
+        for(size_t i = 0; i < 256; i++) freq[i] /= total;
+
+        return l1Score(freq);
+    }
+
+    uint8_t bestGuess(size_t start, size_t offset) const noexcept {
+        static constexpr uint8_t LOW_GUESS = 32;
+        static constexpr uint8_t HIGH_GUESS = 126;
+
+        double best_score = scoreGuess(start, offset, LOW_GUESS);
+        uint8_t best_guess = LOW_GUESS;
+        for(uint8_t i = LOW_GUESS+1; i <= HIGH_GUESS; i++){
+            double score = scoreGuess(start, offset, i);
+            if(score < best_score){
+                best_score = score;
+                best_guess = i;
+            }
+        }
+        return best_guess;
+    }
+
+    std::string bestRepeatingXorKey(size_t key_size) const {
+        std::string guessed_key;
+        guessed_key.resize(key_size);
+
+        for(size_t i = 0; i < key_size; i++)
+            guessed_key[i] = bestGuess(i, key_size);
+
+        return guessed_key;
     }
 };
 

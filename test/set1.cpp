@@ -16,6 +16,7 @@ using namespace CryptoFriends;
 
 static std::string getFileContents(const char* file_name){
     std::ifstream in(file_name);
+    assert(in.is_open());
     std::stringstream buffer;
     buffer << in.rdbuf();
     std::string str = buffer.str();
@@ -98,39 +99,21 @@ bool Set_1_Problem_2(){
 }
 
 bool Set_1_Problem_3(){
+    bool fail = false;
+
     static constexpr std::string_view xor_encrypted_hex_string =
             "1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736";
 
     static constexpr std::string_view decrypted_msg =
             "Cooking MC's like a pound of bacon";
 
-    const ByteArray xor_encrypted_bytes = ByteArray::fromHexString(xor_encrypted_hex_string);
-    bool fail = false;
+    ByteArray xor_encrypted_bytes = ByteArray::fromHexString(xor_encrypted_hex_string);
 
-    double best_score = 1;
-    uint8_t best_key;
-    for(uint16_t i = 0; i < 255; i++){
-        ByteArray cipher;
-        for(size_t j = 0; j < xor_encrypted_hex_string.length()/2; j++)
-            cipher.addBits<8>(i);
-        ByteArray output = ByteArray::exclusiveOr(xor_encrypted_bytes, cipher);
-        std::string str_out = output.toAscii();
+    std::string key;
+    key += xor_encrypted_bytes.bestGuess(0, 1);
+    xor_encrypted_bytes.applyRepeatingKeyXor(key);
 
-        double score = l1Score(str_out);
-        if(score < best_score){
-            best_score = score;
-            best_key = static_cast<uint8_t>(i);
-        }
-        //std::cout << "Key " << (int)i << ": " << score << "  |  "<< str_out << std::endl;
-        //88: Cooking MC's like a pound of bacon
-    }
-
-    ByteArray cipher;
-    for(size_t j = 0; j < xor_encrypted_hex_string.length()/2; j++)
-        cipher.addBits<8>(best_key);
-
-    ByteArray guess = ByteArray::exclusiveOr(xor_encrypted_bytes, cipher);
-    if(guess.toAscii() != decrypted_msg){
+    if(xor_encrypted_bytes.toAscii() != decrypted_msg){
         fail = true;
         std::cout << "S1P3: failed to decrypt message" << std::endl;
     }
@@ -152,40 +135,31 @@ bool Set_1_Problem_4(){
     while(std::getline(in, line))
         if(!line.empty()) lines.push_back(line);
 
-    double best_score = 1;
+    double best_score = std::numeric_limits<double>::max();
     uint8_t best_key;
     size_t best_line;
     for(size_t line_num = 0; line_num < lines.size(); line_num++){
         const std::string& line = lines[line_num];
         const ByteArray xor_encrypted_bytes = ByteArray::fromHexString(line);
         for(uint16_t i = 0; i < 255; i++){
-            ByteArray cipher;
-            for(size_t j = 0; j < line.length()/2; j++)
-                cipher.addBits<8>(i);
-            ByteArray output = ByteArray::exclusiveOr(xor_encrypted_bytes, cipher);
-            std::string str_out = output.toAscii();
-
-            double score = l1Score(str_out);
+            double score = xor_encrypted_bytes.scoreGuess(0, 1, i);
             if(score < best_score){
                 best_score = score;
                 best_key = static_cast<uint8_t>(i);
                 best_line = line_num;
             }
-
-            //if(score < 0.6) std::cout << (int)line_num << ", Key " << (int)i << " | " << score << " :  "<< str_out << std::endl;
             //Line 170, key 53: Now that the party is jumping
         }
     }
 
     line = lines[best_line];
     const ByteArray xor_encrypted_bytes = ByteArray::fromHexString(line);
+    ByteArray decrypted = xor_encrypted_bytes;
+    std::string key;
+    key += best_key;
+    decrypted.applyRepeatingKeyXor(key);
 
-    ByteArray cipher;
-    for(size_t j = 0; j < line.length()/2; j++)
-        cipher.addBits<8>(best_key);
-
-    ByteArray guess = ByteArray::exclusiveOr(xor_encrypted_bytes, cipher);
-    if(guess.toAscii() != decrypted_msg){
+    if(decrypted.toAscii() != decrypted_msg){
         fail = true;
         std::cout << "S1P4: failed to find/decrypt message" << std::endl;
     }
@@ -235,8 +209,11 @@ bool Set_1_Problem_6(){
     }
 
     std::string encrypted_base64 = getFileContents("6.txt");
-    encrypted_base64.erase(remove(encrypted_base64.begin(), encrypted_base64.end(), '\n'), encrypted_base64.end());
+    static constexpr std::string_view KEY_SOLVED = "Terminator X: Bring the noise";
     const ByteArray encrypted_bytes = ByteArray::fromBase64String(encrypted_base64);
+
+    ByteArray sol = encrypted_bytes;
+    sol.applyRepeatingKeyXor(KEY_SOLVED);
 
     static constexpr size_t KEY_SIZE_MIN_BYTES = 2;
     static constexpr size_t KEY_SIZE_MAX_BYTES = 40;
@@ -273,68 +250,38 @@ bool Set_1_Problem_6(){
         [](const Result& a, const Result& b){return a.normalised_edit_distance < b.normalised_edit_distance;}
     );
 
-    static constexpr size_t RESULTS_TO_USE = 5;
+    static constexpr size_t RESULTS_TO_USE = 35;
+
+    double best_score = std::numeric_limits<double>::max();
+    std::string key;
+    std::string decrypted_msg;
 
     for(size_t i = 0; i < RESULTS_TO_USE; i++){
         const Result& result = results[i];
-        std::vector<ByteArray> arrays;
-        arrays.resize(result.key_size);
+        std::string guessed_key = encrypted_bytes.bestRepeatingXorKey(result.key_size);
+        ByteArray decrypted = encrypted_bytes;
+        decrypted.applyRepeatingKeyXor(guessed_key);
+        const std::string resulting_msg = decrypted.toAscii();
 
-        std::vector<std::string> decoded_strings;
-        decoded_strings.resize(result.key_size);
-
-        //Divide the encryped data for single-XOR analysis
-        size_t index = 0;
-        for(size_t byte = 0; byte < encrypted_bytes.numBytes(); byte++){
-            arrays[index++].addBits<8>( encrypted_bytes.getByte(byte) );
-            if(index == arrays.size()) index = 0;
+        double score = l1Score(resulting_msg);
+        if(score < best_score){
+            best_score = score;
+            key = guessed_key;
+            decrypted_msg = resulting_msg;
         }
-
-        for(size_t j = 0; j < result.key_size; j++){
-            const ByteArray& divided_array = arrays[j];
-            double best_score = std::numeric_limits<double>::max();
-            for(uint16_t i = 0; i < 255; i++){
-                ByteArray cipher;
-                for(size_t j = 0; j < divided_array.numBytes(); j++)
-                    cipher.addBits<8>(i);
-                ByteArray output = ByteArray::exclusiveOr(divided_array, cipher);
-                std::string str_out = output.toAscii();
-
-                double score = l1Score(str_out);
-                if(score < best_score){
-                    best_score = score;
-                    decoded_strings[j] = str_out;
-                }
-            }
-
-            //std::cout << "K" << result.key_size << "i" << j << "g" << i << ": " << decoded_strings[j] << std::endl;
-        }
-
-
-
-        std::string solved;
-        solved.reserve(encrypted_bytes.numBytes());
-        index = 0;
-        size_t str_index = 0;
-        for(size_t byte = 0; byte < encrypted_bytes.numBytes(); byte++){
-            char ch = decoded_strings[index++][str_index];
-            solved += ch;
-            if(index == arrays.size()){
-                index = 0;
-                str_index++;
-            }
-        }
-
-        //std::cout << "Key size " << (int)result.key_size << ":\n"
-        //          << solved << '\n' << std::endl;
     }
 
-    //Now that you probably know the KEYSIZE: break the ciphertext into blocks of KEYSIZE length.
-    //Now transpose the blocks: make a block that is the first byte of every block, and a block that is the second byte of every block, and so on.
-    //Solve each block as if it was single-character XOR. You already have code for this.
-    //For each block, the single-byte XOR key that produces the best looking histogram is the repeating-key XOR key byte for that block. Put them together and you have the key.
+    if(key != KEY_SOLVED){
+        fail = true;
+        std::cout << "S1P6: failed to find key" << std::endl;
+    }
 
-    if(!fail) std::cout << "S1P6: incomplete" << std::endl;
+    if(decrypted_msg != getFileContents("6_solved.txt")){
+        fail = true;
+        std::cout << "S1P6: failed to decode message" << std::endl;
+    }
+
+    if(!fail) std::cout << "S1P6: passing" << std::endl;
 
     return fail;
 }
@@ -344,7 +291,6 @@ bool Set_1_Problem_7(){
 
     static constexpr std::string_view key = "YELLOW SUBMARINE";
     std::string contents_base64 = getFileContents("7.txt");
-    contents_base64.erase(remove(contents_base64.begin(), contents_base64.end(), '\n'), contents_base64.end());
     ByteArray ba = ByteArray::fromBase64String(contents_base64);
     const std::string encryped_ascii = ba.toAscii();
     const std::string plain_text = decrypt(encryped_ascii, key);
@@ -361,6 +307,17 @@ bool Set_1_Problem_7(){
 
 bool Set_1_Problem_8(){
     bool fail = false;
+
+    std::vector<std::string> lines;
+    std::string line;
+    std::ifstream in("8.txt");
+    while(std::getline(in, line))
+        if(!line.empty()) lines.push_back(line);
+
+    for(const std::string line : lines){
+        ByteArray ba = ByteArray::fromBase64String(line);
+    }
+
 
     //EVENTUALLY: complete this
     if(!fail) std::cout << "S1P8: incomplete" << std::endl;
