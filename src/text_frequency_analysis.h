@@ -34,15 +34,6 @@ double l1Score(std::string_view str) noexcept {
     return l1Score(getFrequencies(str));
 }
 
-double l2Score(std::string_view str) noexcept {
-    double residual = 0;
-    auto frequencies = getFrequencies(str);
-    for(size_t i = 0; i < PERMUTATIONS_PER_BYTE; i++)
-        residual += pow(frequencies[i] - FREQUENCY_MAP[i], 2);
-
-    return residual;
-}
-
 }
 
 #endif // TEXTFREQUENCYANALYSIS_H
